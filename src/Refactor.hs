@@ -160,7 +160,9 @@ lhs (ArrayLhs (ArrayIndex a exps)) = do
     nA <- expr a
     nExps <- mapM expr exps
     return (ArrayLhs (ArrayIndex nA nExps))
-lhs x = return x
+lhs (FieldLhs f) = do
+    f' <- fieldAccess f
+    return (FieldLhs f')
 
 -- | Refactor expression
 expr :: Exp -> State Refactor Exp

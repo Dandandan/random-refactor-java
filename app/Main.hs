@@ -51,8 +51,8 @@ main :: IO ()
 main = do
     filesDoc <- readFile "../javafiles.txt"
     let files = lines filesDoc
-    --example
-    --return ()
+    -- example
+    -- return ()
 
     withFile "./output/pairs.txt" WriteMode $ \hp ->
      withFile "./output/unique.txt" WriteMode $ \hu ->

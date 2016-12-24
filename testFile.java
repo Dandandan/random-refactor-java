@@ -29,6 +29,3 @@ public class Stack {
       return top == -1;
    }
 }
-
-public class Stack2 {
-    private Stack stack;}
