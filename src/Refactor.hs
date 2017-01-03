@@ -31,7 +31,7 @@ data Refactor =
 -- Keep maybe or return Nothing
 probKeep :: Maybe a -> Double -> Double-> Maybe a
 probKeep m c r =
-    if r > c then m else Nothing
+    if c >= r then m else Nothing
 
 -- | Keep or reject list of items
 probFilter :: Double -> [a] -> State Refactor [a]
@@ -73,7 +73,6 @@ getIdent old = do
     Refactor { renaming = r } <- get
     return (Map.findWithDefault old old r)
 
--- | Refactor compilation unit with some randomness
 compilationUnit :: CompilationUnit -> State Refactor CompilationUnit
 compilationUnit (CompilationUnit packageDecl importDecls typeDecls) =
   do
@@ -95,20 +94,33 @@ shuffle xs = do
     let gen  = Random.mkStdGen x
     return (shuffle' xs (length xs) gen)
 
+-- |  Select some methods, with lower probability each time
+selectMethod :: Decl -> State Refactor (Maybe Decl)
+selectMethod m@(MemberDecl MethodDecl{}) = do
+    r:_ <- getRandomDoubles
+    ref@Refactor { selectProb = c } <- get
+    let m' = probKeep (Just m) c r
+    -- always select first, keep others with chance of 0.5
+    put (ref { selectProb = 0.5 } )
+
+    return m'
+selectMethod x = return (Just x)
+
 classBody :: ClassBody -> State Refactor ClassBody
 classBody (ClassBody decls) = do
     mapM_ collectDeclNames decls
     nDecls <- mapM decl decls
     shuffledDecls <- shuffle nDecls
-    return $ ClassBody shuffledDecls
+    selection <- mapM selectMethod shuffledDecls
+    return (ClassBody (catMaybes selection))
 
 varDeclId :: VarDeclId -> State Refactor VarDeclId
 varDeclId (VarId i) = do
     i' <- newIdent i id
-    return (VarId i)
+    return (VarId i')
 varDeclId (VarDeclArray a) = do
     d <- varDeclId a
-    return (VarDeclArray a)
+    return (VarDeclArray d)
 
 formalParam :: FormalParam -> State Refactor FormalParam
 formalParam (FormalParam m t b d) = do
@@ -224,6 +236,9 @@ fieldAccess (PrimaryFieldAccess e i) = do
     nE <- expr e
     x <- getIdent i
     return (PrimaryFieldAccess nE x)
+fieldAccess (SuperFieldAccess i) = do
+    x <- getIdent i
+    return (SuperFieldAccess x)
 fieldAccess x = return x
 
 forInit :: ForInit -> State Refactor ForInit
@@ -294,7 +309,6 @@ stmt (Assert e e2) = do
 
 stmt x = return x
 
-
 typ :: Type -> State Refactor Type
 typ (RefType (ClassRefType (ClassType cr))) = do
     Refactor {renaming = r} <- get
@@ -346,7 +360,6 @@ varInit (InitArray (ArrayInit is)) = do
     nIs <- mapM varInit is
     return (InitArray (ArrayInit nIs))
 
--- | Var decls
 varDecl :: VarDecl -> State Refactor VarDecl
 varDecl (VarDecl (VarId old) i) = do
     s <- getIdent old
