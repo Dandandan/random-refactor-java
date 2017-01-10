@@ -181,6 +181,9 @@ expr :: Exp -> State Refactor Exp
 expr (ExpName (Name ns)) = do
     nNames <- mapM getIdent ns
     return (ExpName (Name nNames))
+expr (ArrayCreate t exps i) = do
+    e' <- mapM expr exps
+    return (ArrayCreate t e' i)
 expr (Assign l o e) = do
     nLhs <- lhs l
     nExpr <- expr e
@@ -296,6 +299,11 @@ stmt (BasicFor i e exps s) = do
 
     nStmt <- stmt s
     return (BasicFor nInit nE nEs nStmt)
+stmt (EnhancedFor ms t i e s) = do
+    i' <- getIdent i
+    e' <- expr e
+    s' <- stmt s
+    return (EnhancedFor ms t i' e' s')
 stmt (Assert e e2) = do
     x <- expr e
     x2 <-
@@ -345,12 +353,16 @@ methodBody (MethodBody (Just b)) = do
     return (MethodBody (Just nBody))
 methodBody x = return x
 
-collectVarDecl :: VarDecl -> State Refactor ()
-collectVarDecl (VarDecl (VarId i) _) = do
+collectVarDeclId :: VarDeclId -> State Refactor ()
+collectVarDeclId  (VarId i) = do
     _ <- newIdent i id
     return ()
-collectVarDecl _ = return ()
+collectVarDeclId  (VarDeclArray a) = do
+    collectVarDeclId a
 
+collectVarDecl :: VarDecl -> State Refactor ()
+collectVarDecl (VarDecl varDeclId _) = do
+    collectVarDeclId varDeclId
 
 varInit :: VarInit -> State Refactor VarInit
 varInit (InitExp e) = do
@@ -385,10 +397,10 @@ classDecl (EnumDecl m old t b) = do
 
 collectClassDeclName :: ClassDecl -> State Refactor ()
 collectClassDeclName (ClassDecl _ old _ _ _ _) = do
-    _ <- newIdent old capitalize
+    _ <- newIdent old id
     return ()
 collectClassDeclName (EnumDecl _ old _ _) = do
-    _ <- newIdent old capitalize
+    _ <- newIdent old id
     return ()
 
 collectTypeDeclName :: TypeDecl -> State Refactor ()
@@ -397,7 +409,7 @@ collectTypeDeclName decl =
         ClassTypeDecl d ->
             collectClassDeclName d
         InterfaceTypeDecl (InterfaceDecl _ _ old _ _ _) -> do
-            _ <- newIdent old capitalize
+            _ <- newIdent old id
             return ()
 
 -- | Rename class name
@@ -410,8 +422,3 @@ typeDeclRename decl =
         InterfaceTypeDecl (InterfaceDecl k m old t r b) -> do
             ident <- getIdent old
             return (InterfaceTypeDecl (InterfaceDecl k m ident t r b))
-
--- | Capitalize string
-capitalize :: String -> String
-capitalize [] = []
-capitalize (x: xs) = Char.toUpper x: xs
