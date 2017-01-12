@@ -1,18 +1,28 @@
-public class Stack {
+public class SumStack {
    private int[] items;
-   private int top = 0;
-   public Stack(int size) {
+   private int top = -1;
+   private int sum = 0;
+   public SumStack (int size) {
        items = new int[size];
    }
    public void push (int d) {
        if (top < items.length) {
-           items[++top] = d;
+           top = top + 1;
+           items[top] = d;
+           sum = sum + d;
        }
    }
-   public void pop (int d) {
+   public int pop () {
+       int d = -1;
        if (top >= 0) {
-           items[top] = d;
-           top--;
+           d = items[top];
+           top = top - 1;
+           sum = sum - d;
        }
+       return d;
+   }
+
+   public int sum () {
+       return sum;
    }
 }

@@ -88,15 +88,16 @@ main = do
                         c <- create ast
                         let rC = removeFormatting $ show (pretty c)
 
-                        when (length rA <= 2048 && length rA >= 256 &&
-                              length rB <= 2048 && length rB >= 256 &&
-                              length rC <= 2048 && length rC >= 256) $ do
-                            writeFile ("./output/pairs/" ++ show i ++ "_a.java") rA
-                            writeFile ("./output/pairs/" ++ show i ++ "_b.java") rB
-                            hPutStrLn hp (show i ++ "_a.java," ++ show i ++ "_b.java")
-                            
-                            writeFile ("./output/unique/" ++ show i ++ ".java") rC
-                            hPutStrLn hu (show i ++ ".java")
+                        when (length rA <= 3000 && length rA >= 512 &&
+                              length rB <= 3000 && length rB >= 512) $ do
+                            when (i `mod` 2 == 0) $ do
+                                writeFile ("./output/pairs/" ++ show i ++ "_a.java") rA
+                                writeFile ("./output/pairs/" ++ show i ++ "_b.java") rB
+                                hPutStrLn hp (show i ++ "_a.java," ++ show i ++ "_b.java")
+                            when (i `mod` 2 == 1 &&
+                              length rC <= 3000 && length rC >= 512) $ do
+                                writeFile ("./output/unique/" ++ show i ++ ".java") rC
+                                hPutStrLn hu (show i ++ ".java")
 
                         return ()
                     Left _ ->

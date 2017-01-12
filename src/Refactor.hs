@@ -73,10 +73,19 @@ getIdent old = do
     Refactor { renaming = r } <- get
     return (Map.findWithDefault old old r)
 
+commutativeSwapProb :: Double
+commutativeSwapProb = 0.1
+
+methodSelectionProb :: Double
+methodSelectionProb = 0.5
+
+importRemoveProb :: Double
+importRemoveProb = 0.5
+
 compilationUnit :: CompilationUnit -> State Refactor CompilationUnit
 compilationUnit (CompilationUnit packageDecl importDecls typeDecls) =
   do
-    nImportDecls <- probFilter 0.5 importDecls
+    nImportDecls <- probFilter importRemoveProb importDecls
     shuffledImports <- shuffle nImportDecls
     mapM_ collectTypeDeclName typeDecls
     ntypeDecls <- mapM typeDeclRename typeDecls >>= shuffle
@@ -94,14 +103,15 @@ shuffle xs = do
     let gen  = Random.mkStdGen x
     return (shuffle' xs (length xs) gen)
 
+
 -- |  Select some methods, with lower probability each time
 selectMethod :: Decl -> State Refactor (Maybe Decl)
 selectMethod m@(MemberDecl MethodDecl{}) = do
     r:_ <- getRandomDoubles
     ref@Refactor { selectProb = c } <- get
     let m' = probKeep (Just m) c r
-    -- always select first, keep others with chance of 0.5
-    put (ref { selectProb = 0.5 } )
+    -- always select first, keep others with chance of methodSelectionProb
+    put (ref { selectProb = methodSelectionProb } )
 
     return m'
 selectMethod x = return (Just x)
@@ -176,6 +186,16 @@ lhs (FieldLhs f) = do
     f' <- fieldAccess f
     return (FieldLhs f')
 
+isCommutative :: Op -> Bool
+isCommutative op =
+    case op of
+        Add -> True
+        Mult -> True
+        And -> True
+        Or  -> True
+        _   -> False
+
+
 -- | Refactor expression
 expr :: Exp -> State Refactor Exp
 expr (ExpName (Name ns)) = do
@@ -191,7 +211,15 @@ expr (Assign l o e) = do
 expr (BinOp e1 o e2) = do
     el <- expr e1
     er <- expr e2
-    return (BinOp el o er)
+    r:_ <- getRandomDoubles
+    let
+        comm = isCommutative o
+        (l', r') = 
+            if comm && commutativeSwapProb >= r then 
+                (er, el) 
+            else
+                (el, er)
+    return (BinOp l' o r')
 expr (PostIncrement e) = do
     nE <- expr e
     return (PostIncrement nE)
